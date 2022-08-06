@@ -1,0 +1,14 @@
+*.o
+*.irx
+*.elf
+*.bin
+*.rom0
+*.rom1
+*.rom2
+*.erom
+*.mec
+*.nvm
+
+.vscode/*
+
+*tex*.c
