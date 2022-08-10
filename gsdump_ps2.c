@@ -15,20 +15,24 @@
 void loadIOPModules()
 {
 	SifInitRpc(0);
-	while(!SifIopReset("", 0)){};
-	while(!SifIopSync()){};
+	while (!SifIopReset("", 0))
+	{
+	};
+	while (!SifIopSync())
+	{
+	};
 	SifInitRpc(0);
 	sbv_patch_enable_lmb();
 
 	int ret = SifExecModuleBuffer(ps2dev9_irx, size_ps2dev9_irx, 0, NULL, NULL);
 
-	dprintf("Loaded ps2dev9.irx: %d\n",ret);
+	dprintf("Loaded ps2dev9.irx: %d\n", ret);
 	ret = SifExecModuleBuffer(netman_irx, size_netman_irx, 0, NULL, NULL);
-	dprintf("Loaded netman.irx: %d\n",ret);
+	dprintf("Loaded netman.irx: %d\n", ret);
 	ret = SifExecModuleBuffer(ps2ip_irx, size_ps2ip_irx, 0, NULL, NULL);
-	dprintf("Loaded ps2ip.irx: %d\n",ret);
+	dprintf("Loaded ps2ip.irx: %d\n", ret);
 	ret = SifExecModuleBuffer(smap_irx, size_smap_irx, 0, NULL, NULL);
-	dprintf("Loaded smap.irx: %d\n",ret);
+	dprintf("Loaded smap.irx: %d\n", ret);
 	return;
 }
 
@@ -38,10 +42,10 @@ int main(void)
 	sio_puts("Hello, world!\n");
 
 	loadIOPModules();
-	if(network_init() < 0)
+	if (network_init() < 0)
 		SleepThread();
 
-	if(server_init() < 0)
+	if (server_init() < 0)
 		SleepThread();
 
 	SleepThread();

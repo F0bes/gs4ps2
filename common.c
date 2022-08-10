@@ -2,7 +2,7 @@
 #include <sio.h>
 #include <stdarg.h>
 
-void sio_printf(const char *fmt, ...)
+void sio_printf(const char* fmt, ...)
 {
 	char buf[256];
 	va_list ap;

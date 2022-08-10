@@ -58,19 +58,7 @@ void interpret_command(u8 cmd, u8 size)
 			lwip_send(tcp_client, &resp, sizeof(u8), 0);
 
 			u8* trans_ptr = batched_transfer_buffer;
-			do
-			{
-				gs_transfer_packet packet;
-				packet.type = *trans_ptr;
-				trans_ptr += 4; // 3 bytes of padding
-				packet.size = *(u32*)trans_ptr;
-				trans_ptr += 4;
-				packet.data = (u8*)aligned_alloc(64, packet.size);
-				memcpy(packet.data, trans_ptr, packet.size);
-				dprintf("		gs transfer PATH%d size %X", packet.type, packet.size);
-				gs_glue_transfer(&packet);
-				trans_ptr += packet.size;
-			} while (trans_ptr < batched_transfer_buffer + batched_transfer_size);
+			gs_glue_transfer(trans_ptr, batched_transfer_size);
 
 			free(batched_transfer_buffer);
 			break;

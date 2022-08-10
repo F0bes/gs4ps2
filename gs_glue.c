@@ -14,12 +14,24 @@
 
 u8* gs_glue_transfer_data = 0;
 
-void gs_glue_transfer(gs_transfer_packet* packet)
+void gs_glue_transfer(u8* packet, u32 size)
 {
-	dma_channel_send_normal(DMA_CHANNEL_GIF, packet->data, packet->size / 16, 0, 0); // yolo lol
-	dma_channel_wait(DMA_CHANNEL_GIF, 0);
-	dprintf("Transfer completed\n");
-	free(packet->data);
+	volatile u32* GIFCHCR = ((volatile u32*)0x1000A000);
+	volatile u32* GIFMADR = ((volatile u32*)0x1000A010);
+	volatile u32* GIFQWC = ((volatile u_int*)0x1000A020);
+
+	*GIFMADR = (u32)packet;
+
+	u32 transfer_cnt = size / 16;
+	do
+	{
+		*GIFQWC = transfer_cnt < 0x7FFF ? transfer_cnt : 0x7FFF;
+		transfer_cnt -= *GIFQWC;
+
+		*GIFCHCR = 0x100;
+		while (*GIFCHCR & 0x100)
+			;
+	} while (transfer_cnt > 0);
 }
 
 void gs_glue_vsync()
@@ -62,7 +74,7 @@ void gs_glue_read_fifo(u32 size)
 	*GS_REG_BUSDIR = 0;
 	*VIF1_STAT = 0;
 
-	qword_t *packet = aligned_alloc(64,sizeof(qword_t) * 5);
+	qword_t* packet = aligned_alloc(64, sizeof(qword_t) * 5);
 	qword_t* q = packet;
 
 	PACK_GIFTAG(q, GIF_SET_TAG(1, 1, GIF_PRE_DISABLE, 0, GIF_FLG_PACKED, 1), GIF_REG_AD);
@@ -100,9 +112,9 @@ void gs_glue_registers(gs_registers_packet* packet)
 	dprintf("DISPFB2: %08X\n", packet->DISP[1].DISPFB);
 	*GS_REG_DISPLAY2 = packet->DISP[1].DISPLAY;
 	dprintf("DISPLAY2: %08X\n", packet->DISP[1].DISPLAY);
-//	*GS_REG_SYNCHV = packet->SYNCV;
+	//	*GS_REG_SYNCHV = packet->SYNCV;
 	dprintf("SYNCHV: %08X\n", packet->SYNCV);
-//	*GS_REG_SYNCH2 = packet->SYNCH2;
+	//	*GS_REG_SYNCH2 = packet->SYNCH2;
 	dprintf("SYNCH2: %08X\n", packet->SYNCH2);
 	//*GS_REG_SYNCH1 = packet->SYNCH1;
 	dprintf("SYNCH1: %08X\n", packet->SYNCH1);
@@ -140,7 +152,7 @@ void gs_glue_freeze(u8* data_ptr, u32 version)
 	dprintf("prim\n");
 	SET_GS_REG(GS_REG_PRIM);
 
-	if(version <= 6)
+	if (version <= 6)
 		data_ptr += sizeof(u64); // PRMODE
 
 	dprintf("PRMODECONT\n");
@@ -177,8 +189,8 @@ void gs_glue_freeze(u8* data_ptr, u32 version)
 	*(u64*)data_ptr |= 1; // Reload clut
 	SET_GS_REG(GS_REG_TEX0_1);
 	SET_GS_REG(GS_REG_TEX1_1);
-	if(version <= 6)
-		data_ptr += sizeof(u64); // TEX2 
+	if (version <= 6)
+		data_ptr += sizeof(u64); // TEX2
 	SET_GS_REG(GS_REG_CLAMP_1);
 	SET_GS_REG(GS_REG_MIPTBP1_1);
 	SET_GS_REG(GS_REG_MIPTBP2_1);
@@ -197,8 +209,8 @@ void gs_glue_freeze(u8* data_ptr, u32 version)
 	*(u64*)data_ptr |= 1; // Reload clut
 	SET_GS_REG(GS_REG_TEX0_2);
 	SET_GS_REG(GS_REG_TEX1_2);
-	if(version <= 6)
-		data_ptr += sizeof(u64); // TEX2 
+	if (version <= 6)
+		data_ptr += sizeof(u64); // TEX2
 	SET_GS_REG(GS_REG_CLAMP_2);
 	SET_GS_REG(GS_REG_MIPTBP1_2);
 	SET_GS_REG(GS_REG_MIPTBP2_2);
@@ -210,7 +222,7 @@ void gs_glue_freeze(u8* data_ptr, u32 version)
 	SET_GS_REG(GS_REG_ZBUF_2);
 	if (version <= 4)
 		data_ptr += sizeof(u32) * 7; // skip ???
-		
+
 	dprintf("finished regs\n");
 	PACK_GIFTAG(q, GIF_SET_TAG(5, 1, GIF_PRE_DISABLE, 0, GIF_FLG_PACKED, 1),
 		GIF_REG_AD);

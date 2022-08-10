@@ -6,7 +6,7 @@ EE_LIBS = -lkernel -lpatches -lgraph -ldma -lps2ip -lnetman -ldraw
 # Git version
 GIT_VERSION := "$(shell git describe --abbrev=4 --always --tags)"
 
-EE_CFLAGS = -I$(shell pwd) -Werror -DGIT_VERSION="\"$(GIT_VERSION)\""
+EE_CFLAGS = -I$(shell pwd) -Wno-strict-aliasing -Werror  -DGIT_VERSION="\"$(GIT_VERSION)\""
 
 all: $(EE_BIN)
 
