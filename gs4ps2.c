@@ -1,4 +1,5 @@
 #include "common.h"
+#include "config.h"
 #include "irx/irx.h"
 #include "network.h"
 #include "server.h"
@@ -26,13 +27,13 @@ void loadIOPModules()
 
 	int ret = SifExecModuleBuffer(ps2dev9_irx, size_ps2dev9_irx, 0, NULL, NULL);
 
-	dprintf("Loaded ps2dev9.irx: %d\n", ret);
+	dprint("Loaded ps2dev9.irx: %d\n", ret);
 	ret = SifExecModuleBuffer(netman_irx, size_netman_irx, 0, NULL, NULL);
-	dprintf("Loaded netman.irx: %d\n", ret);
+	dprint("Loaded netman.irx: %d\n", ret);
 	ret = SifExecModuleBuffer(ps2ip_irx, size_ps2ip_irx, 0, NULL, NULL);
-	dprintf("Loaded ps2ip.irx: %d\n", ret);
+	dprint("Loaded ps2ip.irx: %d\n", ret);
 	ret = SifExecModuleBuffer(smap_irx, size_smap_irx, 0, NULL, NULL);
-	dprintf("Loaded smap.irx: %d\n", ret);
+	dprint("Loaded smap.irx: %d\n", ret);
 	return;
 }
 
@@ -40,6 +41,8 @@ int main(void)
 {
 	(*(volatile u_int*)0x10003000) = 1;
 	sio_puts("Hello, world!\n");
+
+	LoadConfig();
 
 	loadIOPModules();
 	if (network_init() < 0)

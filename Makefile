@@ -1,7 +1,7 @@
-EE_BIN = gsdump_ps2.elf
-EE_OBJS = gsdump_ps2.o network.o common.o server.o gs_glue.o
+EE_BIN = gs4ps2.elf
+EE_OBJS = gs4ps2.o network.o common.o server.o gs_glue.o config.o
 EE_OBJS += irx/ps2dev9_irx.o irx/netman_irx.o irx/ps2ip_irx.o irx/smap_irx.o
-EE_LIBS = -lkernel -lpatches -lgraph -ldma -lps2ip -lnetman -ldraw
+EE_LIBS = -lkernel -lpatches -lgraph -ldma -lps2ip -lnetman
 
 # Git version
 GIT_VERSION := "$(shell git describe --abbrev=4 --always --tags)"

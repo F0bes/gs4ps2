@@ -3,8 +3,13 @@
 #include <stdio.h>
 #include <sio.h>
 
+#define UDP_OUT
+
+#ifdef UDP_OUT
+extern u32 common_client_dest;
+void common_udpmsg_init();
+#endif
 
 void sio_printf(const char* fmt, ...);
 
-//#define dprintf(...) printf(__VA_ARGS__); sio_printf(__VA_ARGS__);
-#define dprintf(...) sio_printf(__VA_ARGS__);
+void dprint(const char* fmt, ...);
