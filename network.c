@@ -237,6 +237,7 @@ s32 network_init(void)
 	dprint("Initialized:\n");
 
 #ifdef UDP_OUT
+if(*(u32*)CFG_VALS[CFG_OPT_UDPTTY])
 	common_udpmsg_init();
 #endif
 	ethdprintIPConfig();

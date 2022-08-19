@@ -69,6 +69,7 @@ void dprint(const char* fmt, ...)
 	va_end(ap);
 	sio_puts(buf);
 #ifdef UDP_OUT
-	udp_broadcast(buf);
+	if(udp_inited)
+		udp_broadcast(buf);
 #endif
 }

@@ -40,7 +40,6 @@ void loadIOPModules()
 int main(void)
 {
 	(*(volatile u_int*)0x10003000) = 1;
-	sio_puts("Hello, world!\n");
 
 	LoadConfig();
 

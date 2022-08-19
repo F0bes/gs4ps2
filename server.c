@@ -40,8 +40,11 @@ void interpret_command(u8 cmd, u8 size)
 			do
 			{
 				u32 recv_ret = lwip_recv(tcp_client, batched_transfer_buffer + bytes_read, batched_transfer_size - bytes_read, 0);
+				if (recv_ret == -1)
+					return;
 				bytes_read += recv_ret;
-				dprint("received: %d\nrem: %d\n", recv_ret, batched_transfer_size - bytes_read);
+				if (*(s32*)CFG_VALS[CFG_OPT_NET_DBG_MSG])
+					dprint("received: %d\nrem: %d\n", recv_ret, batched_transfer_size - bytes_read);
 			} while (bytes_read < batched_transfer_size);
 
 			u8 calc_CRC = 0;
@@ -56,6 +59,7 @@ void interpret_command(u8 cmd, u8 size)
 				lwip_send(tcp_client, &resp, sizeof(u8), 0);
 				break;
 			}
+			dprint("First qword of batched transfer: %llX\n", *(u64*)batched_transfer_buffer);
 			lwip_send(tcp_client, &resp, sizeof(u8), 0);
 
 			u8* trans_ptr = batched_transfer_buffer;
@@ -91,8 +95,11 @@ void interpret_command(u8 cmd, u8 size)
 			do
 			{
 				u32 recv_ret = lwip_recv(tcp_client, (u8*)packet + received_cnt, size - received_cnt, 0);
+				if (recv_ret == -1)
+					return;
 				received_cnt += recv_ret;
-				dprint("received: %d\nrem: %d\n", recv_ret, size - received_cnt);
+				if (*(s32*)CFG_VALS[CFG_OPT_NET_DBG_MSG])
+					dprint("received: %d\nrem: %d\n", recv_ret, size - received_cnt);
 			} while (received_cnt < size);
 			u8 calc_CRC = 0;
 			crc8_buffer(&calc_CRC, (u8*)packet, sizeof(gs_registers_packet));
@@ -119,7 +126,7 @@ void interpret_command(u8 cmd, u8 size)
 			lwip_recv(tcp_client, &CRC, sizeof(u8), 0);
 			u32 freeze_size;
 			u32 recv_ret = lwip_recv(tcp_client, &freeze_size, sizeof(u32), 0);
-			dprint("savestate(freeze) is %d bytes (CRC %X)\n", CRC, freeze_size);
+			dprint("savestate(freeze) is %d bytes (CRC %X)\n", freeze_size, CRC);
 			// HACK: I NEED THE FIRST 4 BYTES AND THEN THE QWORDS AFTER IT
 			// GCC ALLOWS UNALIGNED DWORD LOADS WHICH END UP CAUSING AN ADDRESS
 			// EXCEPTION. SO READ THE FIRST 4 BYTES, AND THEN FILL THE FREEZE DATA
@@ -130,7 +137,10 @@ void interpret_command(u8 cmd, u8 size)
 			do
 			{
 				recv_ret = lwip_recv(tcp_client, freeze_data + received_cnt, freeze_size - received_cnt, 0);
-				dprint("received: %d\nrem: %d\n", recv_ret, freeze_size - received_cnt);
+				if (recv_ret == -1)
+					return;
+				if (*(s32*)CFG_VALS[CFG_OPT_NET_DBG_MSG])
+					dprint("received: %d\nrem: %d\n", recv_ret, freeze_size - received_cnt);
 				received_cnt += recv_ret;
 			} while (received_cnt < freeze_size);
 

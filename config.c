@@ -16,6 +16,8 @@ const char* CFG_NAMES[COUNT_CFG] =
 		"priv-synch",
 		"transfer-timeout",
 		"transfer-msg-timeout",
+		"udptty",
+		"net-dbg-msg"
 };
 
 void* CFG_VALS[COUNT_CFG];
@@ -25,7 +27,7 @@ const char* CFG_DEFAULT =
 
 	"\n# Networking settings.\n"
 	"# Use DHCP\n"
-	"dhcp=1\n"
+	"dhcp=0\n"
 	"# Static addresses to use when DHCP is disabled\n"
 	"ip=192.168.1.10\n"
 	"nm=255.255.255.0\n"
@@ -34,11 +36,16 @@ const char* CFG_DEFAULT =
 	"\n# Interpretation settings.\n"
 	"# Optionally set SYNCHV, SYNCH1, SYNCH2, SRFSH priviledged registers\n"
 	"# Some dumps can set them to values incompatible with your television\n"
-	"priv-synch=0\n"
+	"priv-synch=1\n"
 	"# GIF transfer timeout in (0 to disable, decimal)\n"
 	"transfer-timeout=300\n"
 	"# Transfer timeout message timeout\n"
-	"transfer-msg-timeout=1000\n";
+	"transfer-msg-timeout=1000\n"
+	"\n# Communication settings.\n"
+	"# Toggles 'udptty', might be slower but you can use ps2client to see logging\n"
+	"udptty=1\n"
+	"# Toggles networking messages, great speedup when off :)"
+	"net-dbg-msg=0";
 
 int cfg_parse_s32(u32 cfg_index, const char* str)
 {
@@ -84,6 +91,8 @@ int (*CFG_PARSE[COUNT_CFG])(u32 cfg_index, const char* str) =
 		cfg_parse_s32,
 		cfg_parse_u32,
 		cfg_parse_u32,
+		cfg_parse_s32,
+		cfg_parse_s32,
 };
 
 FILE* g_cfgFile;
@@ -92,7 +101,7 @@ void LoadDefaults(void)
 {
 	// Wish I had templating, why did I choose C. xP
 	CFG_VALS[CFG_OPT_DHCP] = malloc(sizeof(int));
-	*(int*)CFG_VALS[CFG_OPT_DHCP] = 1;
+	*(int*)CFG_VALS[CFG_OPT_DHCP] = 0;
 	CFG_VALS[CFG_OPT_IP] = malloc(sizeof(struct ip4_addr));
 	ip4_addr_set_zero((struct ip4_addr*)CFG_VALS[CFG_OPT_IP]);
 	CFG_VALS[CFG_OPT_NM] = malloc(sizeof(struct ip4_addr));
@@ -101,7 +110,7 @@ void LoadDefaults(void)
 	ip4_addr_set_zero((struct ip4_addr*)CFG_VALS[CFG_OPT_GW]);
 
 	CFG_VALS[CFG_OPT_SYNCH_PRIV] = malloc(sizeof(int));
-	*(int*)CFG_VALS[CFG_OPT_SYNCH_PRIV] = 0;
+	*(int*)CFG_VALS[CFG_OPT_SYNCH_PRIV] = 1;
 	CFG_VALS[CFG_OPT_GIF_TIMEOUT] = malloc(sizeof(int));
 	*(int*)CFG_VALS[CFG_OPT_GIF_TIMEOUT] = 300;
 	CFG_VALS[CFG_OPT_GIF_MSG_TIMEOUT] = malloc(sizeof(int));

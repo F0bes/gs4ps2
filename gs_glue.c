@@ -32,12 +32,14 @@ void gs_glue_transfer(u8* packet, u32 size)
 		FlushCache(0);
 		*GIFCHCR = 0x100;
 		u32 timeout = *(u32*)CFG_VALS[CFG_OPT_GIF_TIMEOUT];
-		dprint("timeout: %d\n", timeout);
 		while (*GIFCHCR & 0x100)
 		{
 			if (timeout)
 			{
-				if (timeout-- == 0)
+				// I don't think this works, and when I made it work,
+				// it didn't work :) (Possibly I had my delay set too low
+				// and it was timing out the transfer mid transfer)
+				if (!(timeout--))
 				{
 					dprint("!!!!!!!!!!!WARNING!!!!!!!!!!!\n");
 					dprint("GIF TRANSFER TIMEOUT, RESETING GIF AND TRYING TO RECOVER\n");
@@ -46,7 +48,7 @@ void gs_glue_transfer(u8* packet, u32 size)
 
 					// Wait a bit so we can see the message above
 					timeout = *(u32*)CFG_VALS[CFG_OPT_GIF_MSG_TIMEOUT];
-					while (--timeout)
+					while (timeout--)
 						asm volatile("nop\n");
 					break;
 				}
@@ -91,8 +93,8 @@ void gs_glue_read_fifo(u32 size)
 	// by reading the FIFO directly. Apparently this is how retail games do it.
 	while ((*VIF1_STAT >> 24))
 	{
-		u32 blah = *VIF1FIFO;
-		blah += 1; // need to use blah to avoid unused error
+		// unused attribute
+		__attribute((unused)) u32 blah = *VIF1FIFO;
 		nopdelay();
 	}
 
@@ -169,10 +171,8 @@ void gs_glue_registers(gs_registers_packet* packet)
 
 void gs_glue_freeze(u8* data_ptr, u32 version)
 {
-	dprint("frozen state version %d\n", version);
+	dprint("state version %d\n", version);
 	qword_t* reg_packet = aligned_alloc(64, sizeof(qword_t) * 200);
-	dprint("glue freeze data: %p\n", data_ptr);
-	dprint("glue freeze packet: %p\n", reg_packet);
 	qword_t* q = reg_packet;
 
 	PACK_GIFTAG(q, GIF_SET_TAG(3, 0, GIF_PRE_DISABLE, 0, GIF_FLG_PACKED, 13),
@@ -181,42 +181,26 @@ void gs_glue_freeze(u8* data_ptr, u32 version)
 			((u64)GIF_REG_AD << 36) | ((u64)GIF_REG_AD << 40) | ((u64)GIF_REG_AD << 44) | ((u64)GIF_REG_AD << 48));
 
 	q++;
-	dprint("prim\n");
 	SET_GS_REG(GS_REG_PRIM);
 
 	if (version <= 6)
 		data_ptr += sizeof(u64); // PRMODE
 
-	dprint("PRMODECONT\n");
 	SET_GS_REG(GS_REG_PRMODECONT);
-	dprint("TEXCLUT\n");
 	SET_GS_REG(GS_REG_TEXCLUT);
-	dprint("GS_REG_SCANMSK\n");
 	SET_GS_REG(GS_REG_SCANMSK);
-	dprint("GS_REG_TEXA\n");
 	SET_GS_REG(GS_REG_TEXA);
-	dprint("GS_REG_FOGCOL\n");
 	SET_GS_REG(GS_REG_FOGCOL);
-	dprint("GS_REG_DIMX\n");
 	SET_GS_REG(GS_REG_DIMX);
-	dprint("GS_REG_DTHE\n");
 	SET_GS_REG(GS_REG_DTHE);
-	dprint("GS_REG_COLCLAMP\n");
-	SET_GS_REG(GS_REG_COLCLAMP);
-	dprint("GS_REG_PABE\n");
+	SET_GS_REG(GS_REG_COLCLAMP);;
 	SET_GS_REG(GS_REG_PABE);
-	dprint("GS_REG_BITBLTBUF\n");
 	SET_GS_REG(GS_REG_BITBLTBUF);
-	dprint("GS_REG_TRXDIR\n");
 	SET_GS_REG(GS_REG_TRXDIR);
-	dprint("GS_REG_TRXPOS\n");
 	SET_GS_REG(GS_REG_TRXPOS);
-	dprint("GS_REG_TRXREG\n");
 	SET_GS_REG(GS_REG_TRXREG);
-	dprint("GS_REG_TRXREG\n");
 	SET_GS_REG(GS_REG_TRXREG);
 
-	dprint("CTXT 1 regs\n");
 	SET_GS_REG(GS_REG_XYOFFSET_1);
 	*(u64*)data_ptr |= 1; // Reload clut
 	SET_GS_REG(GS_REG_TEX0_1);
@@ -236,7 +220,6 @@ void gs_glue_freeze(u8* data_ptr, u32 version)
 	if (version <= 4)
 		data_ptr += sizeof(u32) * 7; // skip ???
 
-	dprint("CTXT 2 regs\n");
 	SET_GS_REG(GS_REG_XYOFFSET_2);
 	*(u64*)data_ptr |= 1; // Reload clut
 	SET_GS_REG(GS_REG_TEX0_2);
@@ -255,7 +238,6 @@ void gs_glue_freeze(u8* data_ptr, u32 version)
 	if (version <= 4)
 		data_ptr += sizeof(u32) * 7; // skip ???
 
-	dprint("finished regs\n");
 	PACK_GIFTAG(q, GIF_SET_TAG(5, 1, GIF_PRE_DISABLE, 0, GIF_FLG_PACKED, 1),
 		GIF_REG_AD);
 	q++;
