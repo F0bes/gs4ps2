@@ -13,6 +13,36 @@
 
 #include "common.h"
 
+static void _gs_glue_set_privileged(gs_registers_packet* packet);
+
+static gs_registers_packet* privRegCache[2];
+
+static s32 _gs_glue_vsync_handler(s32 cause)
+{
+	if (privRegCache[0] != NULL && privRegCache[1] != NULL)
+	{
+		_gs_glue_set_privileged(privRegCache[!(*GS_REG_CSR & (1 << 13))]);
+	}
+
+	ExitHandler();
+	return 0;
+}
+
+static s32 vsyncHandler = 0;
+void gs_glue_init(void)
+{
+	if (*(s32*)CFG_VALS[CFG_OPT_PRIV_CSR_AWARE])
+	{
+		DIntr();
+		if (!vsyncHandler)
+		{
+			vsyncHandler = AddIntcHandler(INTC_VBLANK_S, _gs_glue_vsync_handler, -1);
+			EnableIntc(INTC_VBLANK_S);
+		}
+		EIntr();
+	}
+}
+
 u8* gs_glue_transfer_data = 0;
 
 // Packet should point to a huge chunk of GIF packets
@@ -58,9 +88,35 @@ void gs_glue_transfer(u8* packet, u32 size)
 	} while (transfer_cnt > 0);
 }
 
+static void _gs_glue_set_privileged(gs_registers_packet* packet)
+{
+	*GS_REG_BGCOLOR = packet->BGCOLOR;
+	*GS_REG_EXTWRITE = packet->EXTWRITE;
+	*GS_REG_EXTDATA = packet->EXTDATA;
+	*GS_REG_EXTBUF = packet->EXTBUF;
+	*GS_REG_DISPFB1 = packet->DISP[0].DISPFB;
+	*GS_REG_DISPLAY1 = packet->DISP[0].DISPLAY;
+	*GS_REG_DISPFB2 = packet->DISP[1].DISPFB;
+	*GS_REG_DISPLAY2 = packet->DISP[1].DISPLAY;
+
+	if (*(u32*)CFG_VALS[CFG_OPT_SYNCH_PRIV])
+	{
+		*GS_REG_SYNCHV = packet->SYNCV;
+		*GS_REG_SYNCH2 = packet->SYNCH2;
+		*GS_REG_SYNCH1 = packet->SYNCH1;
+		*GS_REG_SRFSH = packet->SRFSH;
+	}
+	else
+	{
+		dprint("Skipping SYNCHV SYNCH2, SYNCH1, and SRFSH as per config.\n");
+	}
+	*GS_REG_SMODE2 = packet->SMODE2;
+	*GS_REG_PMODE = packet->PMODE;
+	*GS_REG_SMODE1 = packet->SMODE1;
+}
+
 void gs_glue_vsync()
 {
-	graph_wait_vsync();
 }
 
 // FFX logo does a FIFO read
@@ -119,47 +175,32 @@ void gs_glue_read_fifo(u32 size)
 
 void gs_glue_registers(gs_registers_packet* packet)
 {
-	// SYNC registers are skipped as I get issues with them.
-	// Noteable a black and white image, with a lot of banding.
 
-	*GS_REG_BGCOLOR = packet->BGCOLOR;
-	dprint("BGCOLOR: %08X\n", packet->BGCOLOR);
-	*GS_REG_EXTWRITE = packet->EXTWRITE;
-	dprint("EXTWRITE: %08X\n", packet->EXTWRITE);
-	*GS_REG_EXTDATA = packet->EXTDATA;
-	dprint("EXTDATA: %08X\n", packet->EXTDATA);
-	*GS_REG_EXTBUF = packet->EXTBUF;
-	dprint("EXTBUF: %08X\n", packet->EXTBUF);
-	*GS_REG_DISPFB1 = packet->DISP[0].DISPFB;
-	dprint("DISPFB1: %08X\n", packet->DISP[0].DISPFB);
-	*GS_REG_DISPLAY1 = packet->DISP[0].DISPLAY;
-	dprint("DISPLAY1: %08X\n", packet->DISP[0].DISPLAY);
-	*GS_REG_DISPFB2 = packet->DISP[1].DISPFB;
-	dprint("DISPFB2: %08X\n", packet->DISP[1].DISPFB);
-	*GS_REG_DISPLAY2 = packet->DISP[1].DISPLAY;
-	dprint("DISPLAY2: %08X\n", packet->DISP[1].DISPLAY);
-
-	if (*(u32*)CFG_VALS[CFG_OPT_SYNCH_PRIV])
+	// Cache our privileged registers and set them during vsync
+	if (*(s32*)CFG_VALS[CFG_OPT_PRIV_CSR_AWARE])
 	{
-		*GS_REG_SYNCHV = packet->SYNCV;
-		dprint("SYNCHV: %08X\n", packet->SYNCV);
-		*GS_REG_SYNCH2 = packet->SYNCH2;
-		dprint("SYNCH2: %08X\n", packet->SYNCH2);
-		*GS_REG_SYNCH1 = packet->SYNCH1;
-		dprint("SYNCH1: %08X\n", packet->SYNCH1);
-		*GS_REG_SRFSH = packet->SRFSH;
-		dprint("SRFSH: %08X\n", packet->SRFSH);
-	}
-	else
-	{
-		dprint("Skipping SYNCHV SYNCH2, SYNCH1, and SRFSH as per config.\n");
-	}
-	*GS_REG_SMODE2 = packet->SMODE2;
-	dprint("SMODE2: %08X\n", packet->SMODE2);
-	*GS_REG_PMODE = packet->PMODE;
-	dprint("PMODE: %08X\n", packet->PMODE);
-	*GS_REG_SMODE1 = packet->SMODE1;
+		s32 initial = 0;
+		if (privRegCache[0] == NULL || privRegCache[1] == NULL)
+		{
+			initial = 1;
+			dprint("Allocating memory for privileged register storage\n");
+			privRegCache[0] = malloc(sizeof(gs_registers_packet));
+			privRegCache[1] = malloc(sizeof(gs_registers_packet));
+		}
 
+		u32 FIELD = !!(packet->CSR & (1 << 13));
+		if (initial)
+		{
+			memcpy(privRegCache[!FIELD], packet, sizeof(gs_registers_packet));
+		}
+		memcpy(privRegCache[FIELD], packet, sizeof(gs_registers_packet));
+		// Allow the VSYNC handler to set the packet, it will know the proper,
+		// expected FIELD
+	}
+	else // Set our privileged registers immediately if we aren't CSR aware
+	{
+		_gs_glue_set_privileged(packet);
+	}
 	return;
 }
 
@@ -193,7 +234,8 @@ void gs_glue_freeze(u8* data_ptr, u32 version)
 	SET_GS_REG(GS_REG_FOGCOL);
 	SET_GS_REG(GS_REG_DIMX);
 	SET_GS_REG(GS_REG_DTHE);
-	SET_GS_REG(GS_REG_COLCLAMP);;
+	SET_GS_REG(GS_REG_COLCLAMP);
+	;
 	SET_GS_REG(GS_REG_PABE);
 	SET_GS_REG(GS_REG_BITBLTBUF);
 	SET_GS_REG(GS_REG_TRXDIR);

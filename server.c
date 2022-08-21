@@ -10,6 +10,7 @@
 #include <sys/time.h>
 #include <ps2ip.h>
 #include <dma.h>
+#include <errno.h>
 
 static s32 tcp_client;
 static s32 tcp_server;
@@ -157,8 +158,6 @@ void interpret_command(u8 cmd, u8 size)
 				break;
 			}
 			lwip_send(tcp_client, &resp, sizeof(u8), 0);
-			dprint("recv freeze data: %d\n", recv_ret);
-			dprint("errno: %d\n", errno);
 			gs_glue_freeze(freeze_data, freeze_ver);
 			free(freeze_data);
 			break;
@@ -228,6 +227,7 @@ s32 server_init(void)
 {
 	init_crc8();
 	dma_channel_initialize(DMA_CHANNEL_GIF, NULL, 0);
+	gs_glue_init();
 
 	tcp_server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (tcp_server < 0)

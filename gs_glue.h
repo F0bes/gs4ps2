@@ -70,6 +70,7 @@ typedef struct
 
 extern u8* gs_glue_transfer_data;
 
+void gs_glue_init();
 void gs_glue_transfer(u8* packet, u32 size);
 void gs_glue_vsync();
 void gs_glue_read_fifo(u32 size);
