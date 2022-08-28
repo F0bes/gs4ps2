@@ -10,6 +10,7 @@
 #define SERVER_FREEZE     0x05
 #define SERVER_SHUTDOWN   0xFF
 
+#define SERVER_OK_FRAME 0x79
 #define SERVER_OK    0x80
 #define SERVER_RETRY 0x81
 s32 server_init(void);

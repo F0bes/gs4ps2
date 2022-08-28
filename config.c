@@ -125,7 +125,6 @@ u32 LoadDefaults(void)
 	*(s32*)CFG_VALS[CFG_OPT_UDPTTY] = 1;
 	CFG_VALS[CFG_OPT_NET_DBG_MSG] = malloc(sizeof(s32));
 	*(s32*)CFG_VALS[CFG_OPT_NET_DBG_MSG] = 0;
-	
 
 	g_cfgFile = fopen("host:config.txt", "r");
 	if (g_cfgFile == NULL)

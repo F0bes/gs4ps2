@@ -41,10 +41,10 @@ void gs_glue_init(void)
 		}
 		EIntr();
 	}
+	return;
 }
 
 u8* gs_glue_transfer_data = 0;
-
 // Packet should point to a huge chunk of GIF packets
 void gs_glue_transfer(u8* packet, u32 size)
 {
@@ -57,7 +57,7 @@ void gs_glue_transfer(u8* packet, u32 size)
 	u32 transfer_cnt = size / 16;
 	do
 	{
-		*GIFQWC = transfer_cnt < 0x7FFF ? transfer_cnt : 0x7FFF;
+		*GIFQWC = transfer_cnt < 0xF000 ? transfer_cnt : 0xF000;
 		transfer_cnt -= *GIFQWC;
 		FlushCache(0);
 		*GIFCHCR = 0x100;
@@ -86,6 +86,90 @@ void gs_glue_transfer(u8* packet, u32 size)
 		}
 
 	} while (transfer_cnt > 0);
+	return;
+}
+
+gs_vsync_data_header _gs_glue_frame1_header;
+u128* _gs_glue_frame1_data = 0;
+gs_vsync_data_header _gs_glue_frame2_header;
+u128* _gs_glue_frame2_data = 0;
+
+// Keep a copy of the last display settings
+u64 _gs_glue_priv_PMODE;
+u64 _gs_glue_priv_SMODE2;
+u64 _gs_glue_priv_DISPFB1;
+u64 _gs_glue_priv_DISPLAY1;
+u64 _gs_glue_priv_DISPFB2;
+u64 _gs_glue_priv_DISPLAY2;
+
+static void _gs_glue_read_framebuffer(u64 dispfb, u64 display, gs_vsync_data_header* header, u128** dest)
+{
+	*GS_REG_CSR = 2; // Clear any previous FINISH events
+
+	qword_t* packet = aligned_alloc(64, sizeof(qword_t) * 6);
+	qword_t* q = packet;
+	PACK_GIFTAG(q, GIF_SET_TAG(5, 1, GIF_PRE_DISABLE, 0, GIF_FLG_PACKED, 1), GIF_REG_AD);
+	q++;
+	u32 SBA = (dispfb & 0x1FF) * 32;
+	u32 SBW = ((dispfb >> 9) & 0x3F);
+	u32 SPSM = ((dispfb >> 15) & 0x1F);
+	header->PSM = SPSM;
+	q->dw[0] = GS_SET_BITBLTBUF(SBA, SBW, SPSM, 0, 0, 0);
+	q->dw[1] = GS_REG_BITBLTBUF;
+	q++;
+	u32 SSAX = ((dispfb >> 32) & 0x7FF);
+	u32 SSAY = ((dispfb >> 43) & 0x7FF);
+	q->dw[0] = GS_SET_TRXPOS(SSAX, SSAY, 0, 0, 0);
+	q->dw[1] = GS_REG_TRXPOS;
+	q++;
+	u32 MAGH = (((display >> 23) & 0xF)) + 1;
+	u32 RRW = (((display >> 32) & 0xFFF) + 1) / MAGH;
+	header->Width = RRW;
+	u32 MAGV = (((display >> 27) & 0x3)) + 1;
+	u32 RRH = (((display >> 44) & 0x7FF) + 1) / MAGV;
+	if (_gs_glue_priv_SMODE2 & 2)
+		RRH /= 2;
+
+	header->Height = RRH;
+	q->dw[0] = GS_SET_TRXREG(RRW, RRH);
+	q->dw[1] = GS_REG_TRXREG;
+	q++;
+	q->dw[0] = GS_SET_FINISH(1);
+	q->dw[1] = GS_REG_FINISH;
+	q++;
+	q->dw[0] = GS_SET_TRXDIR(1);
+	q->dw[1] = GS_REG_TRXDIR;
+	q++;
+
+	dma_channel_send_normal(DMA_CHANNEL_GIF, packet, q - packet, 0, 0);
+	dma_channel_wait(DMA_CHANNEL_GIF, 0);
+
+	while (!(*GS_REG_CSR & 2))
+		;
+
+	// Our transfer should be set up, read the data from the fifo
+	u32 size = 0;
+	switch (SPSM)
+	{
+		case 0: // PSMCT32
+			size = (RRW * RRH) * 4;
+			break;
+		case 1: // PSMCT24
+			size = (RRW * RRH) * 3;
+			break;
+		case 2: // PSMCT16
+		case 10: // PSMCT16S
+			size = (RRW * RRH) * 2;
+			break;
+		default:
+			size = (RRW * RRH) * 4;
+			break;
+	}
+	header->Bytes = size;
+
+	*dest = gs_glue_read_fifo(size / sizeof(qword_t));
+
+	return;
 }
 
 static void _gs_glue_set_privileged(gs_registers_packet* packet)
@@ -95,9 +179,13 @@ static void _gs_glue_set_privileged(gs_registers_packet* packet)
 	*GS_REG_EXTDATA = packet->EXTDATA;
 	*GS_REG_EXTBUF = packet->EXTBUF;
 	*GS_REG_DISPFB1 = packet->DISP[0].DISPFB;
+	_gs_glue_priv_DISPFB1 = packet->DISP[0].DISPFB;
 	*GS_REG_DISPLAY1 = packet->DISP[0].DISPLAY;
+	_gs_glue_priv_DISPLAY1 = packet->DISP[0].DISPLAY;
 	*GS_REG_DISPFB2 = packet->DISP[1].DISPFB;
+	_gs_glue_priv_DISPFB2 = packet->DISP[1].DISPFB;
 	*GS_REG_DISPLAY2 = packet->DISP[1].DISPLAY;
+	_gs_glue_priv_DISPLAY2 = packet->DISP[1].DISPLAY;
 
 	if (*(u32*)CFG_VALS[CFG_OPT_SYNCH_PRIV])
 	{
@@ -111,16 +199,39 @@ static void _gs_glue_set_privileged(gs_registers_packet* packet)
 		dprint("Skipping SYNCHV SYNCH2, SYNCH1, and SRFSH as per config.\n");
 	}
 	*GS_REG_SMODE2 = packet->SMODE2;
+	_gs_glue_priv_SMODE2 = packet->SMODE2;
 	*GS_REG_PMODE = packet->PMODE;
+	_gs_glue_priv_PMODE = packet->PMODE;
 	*GS_REG_SMODE1 = packet->SMODE1;
+	return;
 }
 
-void gs_glue_vsync()
+int gs_glue_vsync(gs_vsync_data_header* circuit1_header, u32* circuit1_ptr, gs_vsync_data_header* circuit2_header, u32* circuit2_ptr)
 {
+	u32 readCircuits = _gs_glue_priv_PMODE & 3;
+	dprint("Vsync with PMODE 0x%08llx", _gs_glue_priv_PMODE);
+
+	if (readCircuits & 1)
+	{
+		_gs_glue_read_framebuffer(_gs_glue_priv_DISPFB1, _gs_glue_priv_DISPLAY1, circuit1_header, &_gs_glue_frame1_data);
+		circuit1_header->Circuit = 1;
+		dprint("Read circuit 1");
+	}
+	if (readCircuits & 2)
+	{
+		_gs_glue_read_framebuffer(_gs_glue_priv_DISPFB2, _gs_glue_priv_DISPLAY2, circuit2_header, &_gs_glue_frame2_data);
+		circuit2_header->Circuit = 2;
+		dprint("Read circuit 2");
+	}
+
+	*circuit1_ptr = (u32)&_gs_glue_frame1_data[0];
+	*circuit2_ptr = (u32)&_gs_glue_frame2_data[0];
+
+	return readCircuits;
 }
 
 // FFX logo does a FIFO read
-void gs_glue_read_fifo(u32 size)
+u128* gs_glue_read_fifo(u32 QWtotal)
 {
 	volatile u32* VIF1CHCR = (u32*)0x10009000;
 	volatile u32* VIF1MADR = (u32*)0x10009010;
@@ -128,35 +239,48 @@ void gs_glue_read_fifo(u32 size)
 	volatile u32* VIF1FIFO = (u32*)0x10005000;
 	volatile u32* VIF1_STAT = (u32*)0x10003C00;
 
-	*GS_REG_BUSDIR = 1;
 	*VIF1_STAT = (1 << 23); // Set the VIF FIFO direction to VIF1 -> Main Memory
-	u8* unused = (u8*)aligned_alloc(64, size); // TODO: Return this data?
-	u32 bytes2read = size;
+	*GS_REG_BUSDIR = 1;
+	u128* data = (u128*)aligned_alloc(64, QWtotal * sizeof(qword_t)); // TODO: Return this data?
+	u32 QWrem = QWtotal;
 
-	while (bytes2read >= 16)
+	*VIF1MADR = (u32)data;
+	dprint("Doing a readback of %d QW", QWtotal);
+	while (QWrem >= 8) // Data transfers from the FIFO must be 128 byte aligned
 	{
-		*VIF1MADR = (u32)unused;
-		*VIF1QWC = (((0xFFFF) < (bytes2read / 16)) ? (0xFFFF) : (bytes2read / 16));
-		bytes2read -= *VIF1QWC * 16;
+		u32 QWC = (((0xF000) < QWrem) ? (0xF000) : QWrem);
+		QWC &= ~7;
 
+		*VIF1QWC = QWC;
+		QWrem -= QWC;
+
+		dprint("    Reading chunk of %d QW. (Remaining %d)", QWC, QWrem);
 		FlushCache(0);
 		*VIF1CHCR = 0x100;
+		asm __volatile__(" sync.l\n");
 		while (*VIF1CHCR & 0x100)
-			;
+		{
+			//dprint("VIF1CHCR %X\nVIF1STAT %X\nVIF1QWC %X\nGIF_STAT %X\n"
+			//,*VIF1CHCR,*VIF1_STAT, *VIF1QWC, *(volatile u64*)0x10003020);
+		};
 	}
-
+	dprint("Finished off DMAC transfer, manually reading the %d QW from the fifo", QWrem);
 	// Because we truncate the QWC, finish of the rest of the transfer
 	// by reading the FIFO directly. Apparently this is how retail games do it.
+	u32 qwFlushed = 0;
 	while ((*VIF1_STAT >> 24))
 	{
-		// unused attribute
-		__attribute((unused)) u32 blah = *VIF1FIFO;
-		nopdelay();
+		dprint("VIF1_STAT=%llx", *VIF1_STAT);
+		data[QWrem] = *VIF1FIFO;
+		QWrem++;
+		qwFlushed += 4;
+		asm("nop\nnop\nnop\n");
 	}
-
+	dprint("Finished off the manual read (%d QW)\n", qwFlushed);
 	*GS_REG_BUSDIR = 0; // Reset BUSDIR
 	*VIF1_STAT = 0; // Reset FIFO direction
 
+	dprint("Resetting TRXDIR");
 	// Create a data packet that sets TRXDIR to 3, effectively cancelling whatever
 	// transfer may be going on.
 	qword_t* packet = aligned_alloc(64, sizeof(qword_t) * 2);
@@ -169,13 +293,12 @@ void gs_glue_read_fifo(u32 size)
 	dma_channel_send_normal(DMA_CHANNEL_GIF, packet, q - packet, 0, 0);
 	dma_channel_wait(DMA_CHANNEL_GIF, 0);
 
-	free(unused);
 	free(packet);
+	return data;
 }
 
 void gs_glue_registers(gs_registers_packet* packet)
 {
-
 	// Cache our privileged registers and set them during vsync
 	if (*(s32*)CFG_VALS[CFG_OPT_PRIV_CSR_AWARE])
 	{
@@ -360,4 +483,5 @@ void gs_glue_freeze(u8* data_ptr, u32 version)
 	free(reg_packet);
 	free(vram_packet);
 	free(swizzle_vram);
+	return;
 }
