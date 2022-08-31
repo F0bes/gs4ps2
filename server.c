@@ -73,39 +73,46 @@ void interpret_command(u8 cmd, u8 size)
 			dprint("Client requested wait vsync\n");
 			u8 field;
 			lwip_recv(tcp_client, &field, sizeof(u8), 0);
-
-			gs_vsync_data_header circuit_header[2];
-			u32 circuit_data_ptr[2];
-
-			u32 circuits = gs_glue_vsync(&circuit_header[0], &circuit_data_ptr[0], &circuit_header[1], &circuit_data_ptr[1]);
-
-			u8 resp = SERVER_OK_FRAME;
-			lwip_send(tcp_client, &resp, sizeof(u8), 0);
-
-			lwip_send(tcp_client, &circuits, sizeof(circuits), 0);
-
-			for (int i = 0; i <= 1; i++)
+			if (*(s32*)CFG_VALS[CFG_OPT_FRAME_DUMP])
 			{
-				const u32 circuit = i + 1;
-				if (!(circuits & circuit))
+				gs_vsync_data_header circuit_header[2];
+				u32 circuit_data_ptr[2];
+
+				u32 circuits = gs_glue_vsync(&circuit_header[0], &circuit_data_ptr[0], &circuit_header[1], &circuit_data_ptr[1]);
+
+				u8 resp = SERVER_OK_FRAME;
+				lwip_send(tcp_client, &resp, sizeof(u8), 0);
+
+				lwip_send(tcp_client, &circuits, sizeof(circuits), 0);
+
+				for (int i = 0; i <= 1; i++)
 				{
-					continue;
+					const u32 circuit = i + 1;
+					if (!(circuits & circuit))
+					{
+						continue;
+					}
+
+					lwip_send(tcp_client, &circuit_header[i].Circuit, sizeof(circuit_header[i].Circuit), 0);
+					lwip_send(tcp_client, &circuit_header[i].PSM, sizeof(circuit_header[i].PSM), 0);
+					lwip_send(tcp_client, &circuit_header[i].Width, sizeof(circuit_header[i].Width), 0);
+					lwip_send(tcp_client, &circuit_header[i].Height, sizeof(circuit_header[i].Height), 0);
+					lwip_send(tcp_client, &circuit_header[i].Bytes, sizeof(circuit_header[i].Bytes), 0);
+
+					u32 sent_cnt = 0;
+					do
+					{
+						u32 sent = lwip_send(tcp_client, (u8*)(circuit_data_ptr[i]) + sent_cnt,
+							circuit_header[i].Bytes - sent_cnt, 0);
+						sent_cnt += sent;
+					} while (sent_cnt < circuit_header[i].Bytes);
+					free((u8*)circuit_data_ptr[i]);
 				}
-
-				lwip_send(tcp_client, &circuit_header[i].Circuit, sizeof(circuit_header[i].Circuit), 0);
-				lwip_send(tcp_client, &circuit_header[i].PSM, sizeof(circuit_header[i].PSM), 0);
-				lwip_send(tcp_client, &circuit_header[i].Width, sizeof(circuit_header[i].Width), 0);
-				lwip_send(tcp_client, &circuit_header[i].Height, sizeof(circuit_header[i].Height), 0);
-				lwip_send(tcp_client, &circuit_header[i].Bytes, sizeof(circuit_header[i].Bytes), 0);
-
-				u32 sent_cnt = 0;
-				do
-				{
-					u32 sent = lwip_send(tcp_client, (u8*)(circuit_data_ptr[i]) + sent_cnt,
-						circuit_header[i].Bytes - sent_cnt, 0);
-					sent_cnt += sent;
-				} while (sent_cnt < circuit_header[i].Bytes);
-				free((u8*)circuit_data_ptr[i]);
+			}
+			else
+			{
+				u8 resp = SERVER_OK;
+				lwip_send(tcp_client, &resp, sizeof(u8), 0);
 			}
 
 			break;

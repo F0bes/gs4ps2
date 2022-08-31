@@ -27,3 +27,5 @@ transfer-msg-timeout=1000
 udptty=0
 # Toggles networking messages, great speedup when off
 net-dbg-msg=0
+# Toggles dumping frames back over the network
+dump-frames=1

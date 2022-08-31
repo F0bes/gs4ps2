@@ -12,6 +12,7 @@ enum
 	CFG_OPT_GIF_MSG_TIMEOUT, // ptr to uint
 	CFG_OPT_UDPTTY, // ptr to int(boolean)
 	CFG_OPT_NET_DBG_MSG, // ptr to int(boolean)
+	CFG_OPT_FRAME_DUMP, // ptr to int(boolean)
 	COUNT_CFG,
 };
 
