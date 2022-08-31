@@ -18,7 +18,8 @@ const char* CFG_NAMES[COUNT_CFG] =
 		"transfer-timeout",
 		"transfer-msg-timeout",
 		"udptty",
-		"net-dbg-msg"};
+		"net-dbg-msg",
+		"dump-frames"};
 
 void* CFG_VALS[COUNT_CFG];
 
@@ -51,7 +52,10 @@ transfer-msg-timeout=1000
 # Toggles 'udptty', might be slower but you can use ps2client to see logging
 udptty=1
 # Toggles networking messages, great speedup when off
-net-dbg-msg=0)";
+net-dbg-msg=0
+# Toggles dumping frames back over the network
+dump-frames=1
+)";
 
 int cfg_parse_s32(u32 cfg_index, const char* str)
 {
@@ -94,6 +98,7 @@ int (*CFG_PARSE[COUNT_CFG])(u32 cfg_index, const char* str) =
 		cfg_parse_u32,
 		cfg_parse_s32,
 		cfg_parse_s32,
+		cfg_parse_s32,
 };
 
 FILE* g_cfgFile;
@@ -125,6 +130,8 @@ u32 LoadDefaults(void)
 	*(s32*)CFG_VALS[CFG_OPT_UDPTTY] = 1;
 	CFG_VALS[CFG_OPT_NET_DBG_MSG] = malloc(sizeof(s32));
 	*(s32*)CFG_VALS[CFG_OPT_NET_DBG_MSG] = 0;
+	CFG_VALS[CFG_OPT_FRAME_DUMP] = malloc(sizeof(s32));
+	*(s32*)CFG_VALS[CFG_OPT_FRAME_DUMP] = 1;
 
 	g_cfgFile = fopen("host:config.txt", "r");
 	if (g_cfgFile == NULL)
