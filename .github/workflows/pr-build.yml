@@ -1,0 +1,32 @@
+name: Build Pull Request
+
+on:
+  pull_request:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: ps2dev/ps2dev:latest
+    steps:
+      - name: Install dependencies
+        run: |
+          apk add build-base git bash
+
+      - uses: actions/checkout@v2
+      - run: |
+          git config --global --add safe.directory /__w/gs4ps2/gs4ps2
+          git fetch --prune --unshallow
+
+      - name: Compile project
+        run: |
+          make clean all
+          mkdir artifacts
+          cp gs4ps2.elf artifacts/gs4ps2.elf
+          cp config.txt artifacts/config.txt
+
+      - name: Upload ELF
+        uses: actions/upload-artifact@v2
+        with:
+          name: gs4ps2
+          path: artifacts

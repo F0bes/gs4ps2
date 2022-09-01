@@ -1,0 +1,49 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - "master"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: ps2dev/ps2dev:latest
+    permissions:
+      contents: write
+    steps:
+      - name: Install dependencies
+        run: |
+          apk add build-base git bash
+
+      - name: Increment our tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          release_branches: master
+          custom_release_rules: "release:major:New release!"
+
+      - uses: actions/checkout@v2
+      - run: |
+          git config --global --add safe.directory /__w/gs4ps2/gs4ps2
+          git fetch --tags
+
+      - name: Compile project
+        run: |
+          make clean all
+          mkdir binaries
+          cp gs4ps2.elf binaries/gs4ps2.elf
+          cp config.txt binaries/config.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        if: steps.tag_version.outputs.new_tag
+        with:
+          prerelease: true
+          generate_release_notes: true
+          files: |
+            binaries/gs4ps2.elf
+            binaries/config.txt
+          tag_name: ${{ steps.tag_version.outputs.new_tag }}
+
