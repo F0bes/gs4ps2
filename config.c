@@ -17,6 +17,7 @@ const char* CFG_NAMES[COUNT_CFG] =
 		"priv-csr-aware",
 		"transfer-timeout",
 		"transfer-msg-timeout",
+		"force-vmode",
 		"udptty",
 		"net-dbg-msg",
 		"dump-frames"};
@@ -46,6 +47,11 @@ priv-csr-aware=1
 transfer-timeout=300
 # Transfer timeout message timeout
 transfer-msg-timeout=1000
+# Force VMODE
+# 0 -> Disable
+# 1 -> RGB
+# 2 -> YPbPr
+force-vmode=0
 
 # Communication settings.
 
@@ -59,8 +65,6 @@ dump-frames=1
 
 int cfg_parse_s32(u32 cfg_index, const char* str)
 {
-	dprint("Parsing int: %s, index %d\n", str, cfg_index);
-
 	if (sscanf(str, "%d", (s32*)CFG_VALS[cfg_index]) != 1)
 		return -1;
 	return 0;
@@ -68,8 +72,6 @@ int cfg_parse_s32(u32 cfg_index, const char* str)
 
 int cfg_parse_u32(u32 cfg_index, const char* str)
 {
-	dprint("Parsing int: %s, index %d\n", str, cfg_index);
-
 	if (sscanf(str, "%u", (u32*)CFG_VALS[cfg_index]) != 1)
 		return -1;
 	return 0;
@@ -77,7 +79,6 @@ int cfg_parse_u32(u32 cfg_index, const char* str)
 
 int cfg_parse_ip4_addr(u32 cfg_index, const char* str)
 {
-	dprint("Parsing ip: %s\n", str);
 	u32 addr1, addr2, addr3, addr4;
 	if (sscanf(str, "%d.%d.%d.%d", &addr1, &addr2, &addr3, &addr4) != 4)
 		return -1;
@@ -94,6 +95,7 @@ int (*CFG_PARSE[COUNT_CFG])(u32 cfg_index, const char* str) =
 		cfg_parse_ip4_addr,
 		cfg_parse_s32,
 		cfg_parse_s32,
+		cfg_parse_u32,
 		cfg_parse_u32,
 		cfg_parse_u32,
 		cfg_parse_s32,
@@ -125,6 +127,8 @@ u32 LoadDefaults(void)
 	*(u32*)CFG_VALS[CFG_OPT_GIF_TIMEOUT] = 300;
 	CFG_VALS[CFG_OPT_GIF_MSG_TIMEOUT] = malloc(sizeof(u32));
 	*(u32*)CFG_VALS[CFG_OPT_GIF_MSG_TIMEOUT] = 1000;
+	CFG_VALS[CFG_OPT_FORCE_VMODE] = malloc(sizeof(u32));
+	*(u32*)CFG_VALS[CFG_OPT_FORCE_VMODE] = 0;
 
 	CFG_VALS[CFG_OPT_UDPTTY] = malloc(sizeof(u32));
 	*(s32*)CFG_VALS[CFG_OPT_UDPTTY] = 1;

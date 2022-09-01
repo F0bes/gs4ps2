@@ -10,6 +10,7 @@ enum
 	CFG_OPT_PRIV_CSR_AWARE, // ptr to int(boolean)
 	CFG_OPT_GIF_TIMEOUT, // ptr to uint
 	CFG_OPT_GIF_MSG_TIMEOUT, // ptr to uint
+	CFG_OPT_FORCE_VMODE, // ptr to uint
 	CFG_OPT_UDPTTY, // ptr to int(boolean)
 	CFG_OPT_NET_DBG_MSG, // ptr to int(boolean)
 	CFG_OPT_FRAME_DUMP, // ptr to int(boolean)

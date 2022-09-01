@@ -20,6 +20,11 @@ priv-csr-aware=1
 transfer-timeout=300
 # Transfer timeout message timeout
 transfer-msg-timeout=1000
+# Force VMODE
+# 0 -> Disable
+# 1 -> RGB
+# 2 -> YPbPr
+force-vmode=0
 
 # Communication settings.
 

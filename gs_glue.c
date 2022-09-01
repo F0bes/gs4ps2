@@ -202,7 +202,21 @@ static void _gs_glue_set_privileged(gs_registers_packet* packet)
 	_gs_glue_priv_SMODE2 = packet->SMODE2;
 	*GS_REG_PMODE = packet->PMODE;
 	_gs_glue_priv_PMODE = packet->PMODE;
-	*GS_REG_SMODE1 = packet->SMODE1;
+
+	switch(*(u32*)CFG_VALS[CFG_OPT_FORCE_VMODE])
+	{
+		case 1: // RGB (Set GCONT in SMODE1 to 0)
+			packet->SMODE1 &= ~(1 << 25);
+			break;
+		case 2: // YPbPr (Set GCONT in SMODE1 to 1)
+			packet->SMODE1 |= (1 << 25);
+			
+			break;
+		default:
+		break;
+	}
+	*GS_REG_SMODE1 = packet->SMODE1 | (1 << 16);
+
 	return;
 }
 
