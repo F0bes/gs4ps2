@@ -367,7 +367,7 @@ void gs_glue_freeze(u8* data_ptr, u32 version)
 	SET_GS_REG(GS_REG_TRXREG);
 
 	SET_GS_REG(GS_REG_XYOFFSET_1);
-	*(u64*)data_ptr |= 1; // Reload clut
+	*(u64*)data_ptr = ((u64)1 << 61) | (*(u64*)data_ptr & (((u64)1 << 61) - 1)); // Reload clut
 	SET_GS_REG(GS_REG_TEX0_1);
 	SET_GS_REG(GS_REG_TEX1_1);
 	if (version <= 6)
@@ -386,7 +386,7 @@ void gs_glue_freeze(u8* data_ptr, u32 version)
 		data_ptr += sizeof(u32) * 7; // skip ???
 
 	SET_GS_REG(GS_REG_XYOFFSET_2);
-	*(u64*)data_ptr |= 1; // Reload clut
+	*(u64*)data_ptr = ((u64)1 << 61) | (*(u64*)data_ptr & (((u64)1 << 61) - 1)); // Reload clut
 	SET_GS_REG(GS_REG_TEX0_2);
 	SET_GS_REG(GS_REG_TEX1_2);
 	if (version <= 6)
