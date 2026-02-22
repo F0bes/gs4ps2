@@ -50,7 +50,7 @@ void gs_glue_transfer(u8* packet, u32 size)
 {
 	volatile u32* GIFCHCR = ((volatile u32*)0x1000A000);
 	volatile u32* GIFMADR = ((volatile u32*)0x1000A010);
-	volatile u32* GIFQWC = ((volatile u_int*)0x1000A020);
+	volatile u32* GIFQWC = ((volatile u32*)0x1000A020);
 
 	*GIFMADR = (u32)packet;
 
@@ -336,7 +336,7 @@ void gs_glue_registers(gs_registers_packet* packet)
 void gs_glue_freeze(u8* data_ptr, u32 version)
 {
 	dprint("state version %d\n", version);
-	qword_t* reg_packet = aligned_alloc(64, sizeof(qword_t) * 200);
+	qword_t* reg_packet = aligned_alloc(16, sizeof(qword_t) * 200);
 	qword_t* q = reg_packet;
 
 	PACK_GIFTAG(q, GIF_SET_TAG(3, 0, GIF_PRE_DISABLE, 0, GIF_FLG_PACKED, 13),
@@ -358,7 +358,7 @@ void gs_glue_freeze(u8* data_ptr, u32 version)
 	SET_GS_REG(GS_REG_DIMX);
 	SET_GS_REG(GS_REG_DTHE);
 	SET_GS_REG(GS_REG_COLCLAMP);
-	;
+
 	SET_GS_REG(GS_REG_PABE);
 	SET_GS_REG(GS_REG_BITBLTBUF);
 	SET_GS_REG(GS_REG_TRXDIR);
@@ -426,14 +426,35 @@ void gs_glue_freeze(u8* data_ptr, u32 version)
 	// Unsure how to use these
 	data_ptr += sizeof(u32); // m_tr.x
 	data_ptr += sizeof(u32); // m_tr.y
+	if(version >= 9)
+	{
+		// Extra transfer parameters
+		data_ptr += sizeof(u32); // m_tr.w
+		data_ptr += sizeof(u32); // m_tr.h
+		data_ptr += sizeof(u64); // m_tr.m_blit
+		data_ptr += sizeof(u64); // m_tr.m_pos
+		data_ptr += sizeof(u64); // m_tr.m_reg
+		data_ptr += sizeof(u128);// m_tr.rect
+		data_ptr += sizeof(u32); // m_tr.total
+		data_ptr += sizeof(u32); // m_tr.start
+		data_ptr += sizeof(u32); // m_tr.end
+		data_ptr += sizeof(u8); // m_tr.write
+	}
 
-	qword_t* vram_packet = aligned_alloc(64, sizeof(qword_t) * 0x50005);
+	
+	
 
-	u8* swizzle_vram = aligned_alloc(64, 0x400000);
+	qword_t* aligned_unswizzled_vram = aligned_alloc(16, 0x400000);
+
+	memcpy(aligned_unswizzled_vram, data_ptr, 0x400000);
+
+	u8* swizzle_vram = aligned_alloc(16, 0x400000);
 	// The current data is 'RAW' vram data, so deswizzle it, so when we upload it
 	// the GS with swizzle it back to it's 'RAW' format.
-	deswizzleImage(swizzle_vram, data_ptr, 1024 / 64, 1024 / 32);
+	deswizzleImage(swizzle_vram, (const u8*)aligned_unswizzled_vram, 1024 / 64, 1024 / 32);
+	free(aligned_unswizzled_vram);
 
+	qword_t* vram_packet = aligned_alloc(16, sizeof(qword_t) * 0x50005);
 	q = vram_packet;
 	// Set up our registers for the transfer
 	PACK_GIFTAG(q, GIF_SET_TAG(4, 0, 0, 0, GIF_FLG_PACKED, 1), GIF_REG_AD);

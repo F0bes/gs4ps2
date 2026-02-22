@@ -39,7 +39,7 @@ void loadIOPModules()
 
 int main(void)
 {
-	(*(volatile u_int*)0x10003000) = 1;
+	(*(volatile u32*)0x10003000) = 1;
 
 	LoadConfig();
 
